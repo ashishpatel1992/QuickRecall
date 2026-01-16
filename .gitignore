@@ -1,0 +1,26 @@
+# macOS
+.DS_Store
+
+# Xcode
+build/
+*.xcodeproj
+!default.xcodeproj
+*.xcworkspace
+!default.xcworkspace
+xcuserdata/
+*.xccheckout
+*.moved-aside
+DerivedData/
+*.hmap
+*.ipa
+*.xg
+
+# XcodeGen
+*.xcodeproj
+
+# Swift Package Manager
+.swiftpm/
+.build/
+
+# QuickRecall specific
+# (None specific yet, but good to have the section)

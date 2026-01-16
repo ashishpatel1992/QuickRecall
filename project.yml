@@ -1,0 +1,45 @@
+name: QuickRecall
+options:
+  minimumXcodeGenVersion: 2.38.0
+  deploymentTarget:
+    macOS: '13.0'
+packages:
+  KeyboardShortcuts:
+    url: https://github.com/sindresorhus/KeyboardShortcuts
+    from: 1.0.0
+targets:
+  QuickRecall:
+    type: application
+    platform: macOS
+    deploymentTarget: '13.0'
+    sources:
+      - path: QuickRecall
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.quickrecall.app
+        INFOPLIST_FILE: QuickRecall/Info.plist
+        SWIFT_VERSION: 5.9
+        CODE_SIGN_IDENTITY: "-"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    dependencies:
+      - package: KeyboardShortcuts
+    info:
+      path: QuickRecall/Info.plist
+      properties:
+        CFBundleDisplayName: QuickRecall
+        CFBundleName: QuickRecall
+        NSPrincipalClass: NSApplication
+        NSHighResolutionCapable: true
+        LSApplicationCategoryType: public.app-category.productivity
+        NSMicrophoneUsageDescription: "QuickRecall does not use the microphone."
+        NSSupportsAutomaticGraphicsSwitching: true
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
+        LSUIElement: true
+schemes:
+  QuickRecall:
+    build:
+      targets:
+        QuickRecall: all
+    run:
+      config: Debug
