@@ -3,6 +3,21 @@
 > A native macOS app for managing and inserting text snippets with speed and precision.
 
 QuickRecall allows you to store named text snippets and insert them anywhere using a global hotkey. Built with Swift and SwiftUI for a lightweight, native experience.
+<div align="center">
+  <img src="screenshots/screenshot1.png" alt="QuickRecall screenshot 1" width="45%" />
+  <img src="screenshots/screenshot2.png" alt="QuickRecall screenshot 2" width="45%" />
+</div>
+
+
+<div align="center">
+  <a href="https://github.com/ashishpatel1992/QuickRecall/releases/tag/v1.0.0" target="_blank">
+    <img src="https://img.shields.io/badge/Download-v1.0.0-blue?style=for-the-badge" alt="Download v1.0.0" />
+  </a>
+  <br/>
+  <sub>Prefer a one-click install? Grab the v1.0.0 release.</sub>
+ </div>
+
+
 
 ## ✨ Features
 
