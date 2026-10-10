@@ -13,14 +13,28 @@ concurrency:
 jobs:
   build:
     name: Build QuickRecall
-    runs-on: macos-14
+    # XcodeGen emits an objectVersion 77 project, which needs Xcode 16 or newer.
+    runs-on: macos-15
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Select newest available Xcode
+        run: |
+          set -euo pipefail
+          latest=$(ls -d /Applications/Xcode_*.app 2>/dev/null | grep -vi beta | sort -V | tail -1 || true)
+          [ -n "$latest" ] || latest=/Applications/Xcode.app
+          echo "Selecting $latest"
+          sudo xcode-select -s "$latest"
+
       - name: Install XcodeGen
         run: brew install xcodegen xcbeautify
+
+      - name: Show tool versions
+        run: |
+          xcodebuild -version
+          xcodegen --version
 
       - name: Generate Xcode project
         run: xcodegen generate

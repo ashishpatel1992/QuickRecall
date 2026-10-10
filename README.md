@@ -37,7 +37,7 @@ QuickRecall allows you to store named text snippets and insert them anywhere usi
 ### Prerequisites
 
 - macOS 13.0 or later
-- Xcode 14+
+- Xcode 16 or later (XcodeGen generates an objectVersion 77 project)
 - [XcodeGen](https://github.com/yonaskolb/XcodeGen)
 
 ### Installation
