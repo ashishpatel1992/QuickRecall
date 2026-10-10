@@ -13,10 +13,11 @@ struct QuickRecallApp: App {
     }
 
     var body: some Scene {
-        // No main window. Preferences are shown via custom window.
+        // QuickRecall is an LSUIElement app: there is no main window, and Preferences are
+        // presented by AppDelegate via PreferencesWindow. SwiftUI still requires a Scene,
+        // so this placeholder stands in for one.
         Settings {
-            PreferencesView()
-                .environmentObject(appDelegate.snippetStore)
+            EmptyView()
         }
     }
 }

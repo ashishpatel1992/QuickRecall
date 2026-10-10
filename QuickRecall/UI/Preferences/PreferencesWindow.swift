@@ -14,7 +14,7 @@ final class PreferencesWindow {
         window.isReleasedWhenClosed = false
         window.center()
         window.title = "Preferences"
-        window.contentView = NSHostingView(rootView: AnyView(content))
+        window.contentView = NSHostingView(rootView: content)
     }
 
     func show() {

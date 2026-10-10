@@ -28,13 +28,12 @@ targets:
       properties:
         CFBundleDisplayName: QuickRecall
         CFBundleName: QuickRecall
+        CFBundleShortVersionString: 1.0.0
+        CFBundleVersion: '1'
         NSPrincipalClass: NSApplication
         NSHighResolutionCapable: true
         LSApplicationCategoryType: public.app-category.productivity
-        NSMicrophoneUsageDescription: "QuickRecall does not use the microphone."
         NSSupportsAutomaticGraphicsSwitching: true
-        NSAppTransportSecurity:
-          NSAllowsArbitraryLoads: true
         LSUIElement: true
 schemes:
   QuickRecall:

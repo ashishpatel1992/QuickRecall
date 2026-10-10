@@ -22,7 +22,17 @@ struct OverlayView: View {
     var filtered: [Snippet] {
         if query.isEmpty { return store.snippets }
         let q = query.lowercased()
-        return store.snippets.sorted { score($0, q) > score($1, q) }
+        return store.snippets
+            .compactMap { snippet -> (snippet: Snippet, score: Int)? in
+                let value = score(snippet, q)
+                return value > 0 ? (snippet, value) : nil
+            }
+            // Break ties by name so the list doesn't reshuffle on every keystroke.
+            .sorted { lhs, rhs in
+                if lhs.score != rhs.score { return lhs.score > rhs.score }
+                return lhs.snippet.name.localizedCaseInsensitiveCompare(rhs.snippet.name) == .orderedAscending
+            }
+            .map(\.snippet)
     }
 
     var body: some View {
@@ -53,41 +63,60 @@ struct OverlayView: View {
                 }
                 .menuStyle(.borderlessButton)
                 .fixedSize()
+                .onChange(of: searchScope) { _ in
+                    selection = filtered.first?.id
+                }
 
             }
             .padding(.horizontal)
 
-            ScrollViewReader { proxy in
-                List(selection: $selection) {
-                    ForEach(filtered) { snip in
-                        HStack {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(snip.name).font(.headline)
-                                Text(snip.content)
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                    .lineLimit(2)
-                            }
-                            
-                            Spacer()
-                            
-                            Button("Copy") { performInsertion(snippet: snip, copyOnly: true) }
-                                .buttonStyle(.bordered)
-                                .controlSize(.small)
-                            
-                            Button("Insert") { performInsertion(snippet: snip, copyOnly: false) }
-                                .buttonStyle(.bordered)
-                                .controlSize(.small)
-                        }
-                        .tag(snip.id)
-                        .id(snip.id) // Explicit ID for ScrollViewReader
-                    }
+            if filtered.isEmpty {
+                VStack(spacing: 6) {
+                    Spacer()
+                    Image(systemName: store.snippets.isEmpty ? "tray" : "magnifyingglass")
+                        .font(.largeTitle)
+                        .foregroundStyle(.tertiary)
+                    Text(store.snippets.isEmpty
+                         ? "No snippets yet. Add one in Preferences."
+                         : "No snippets match “\(query)”")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                    Spacer()
                 }
-                .listStyle(.inset)
-                .onChange(of: selection) { newSelection in
-                    if let newSelection {
-                        withAnimation {
-                            proxy.scrollTo(newSelection, anchor: .center)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollViewReader { proxy in
+                    List(selection: $selection) {
+                        ForEach(filtered) { snip in
+                            HStack {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(snip.name).font(.headline)
+                                    Text(snip.content)
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                        .lineLimit(2)
+                                }
+
+                                Spacer()
+
+                                Button("Copy") { performInsertion(snippet: snip, copyOnly: true) }
+                                    .buttonStyle(.bordered)
+                                    .controlSize(.small)
+
+                                Button("Insert") { performInsertion(snippet: snip, copyOnly: false) }
+                                    .buttonStyle(.bordered)
+                                    .controlSize(.small)
+                            }
+                            .tag(snip.id)
+                            .id(snip.id) // Explicit ID for ScrollViewReader
+                        }
+                    }
+                    .listStyle(.inset)
+                    .onChange(of: selection) { newSelection in
+                        if let newSelection {
+                            withAnimation {
+                                proxy.scrollTo(newSelection, anchor: .center)
+                            }
                         }
                     }
                 }
@@ -199,13 +228,20 @@ struct ListNavigator: NSViewRepresentable {
     @Binding var selection: UUID?
 
     func makeNSView(context: Context) -> NSView {
-        let view = NSView()
+        let view = NSView(frame: .zero)
+        context.coordinator.hostView = view
+        context.coordinator.start()
         return view
     }
 
     func updateNSView(_ nsView: NSView, context: Context) {
+        context.coordinator.hostView = nsView
         context.coordinator.snippets = snippets
-        context.coordinator.selectionBinding = _selection
+        context.coordinator.selectionBinding = $selection
+    }
+
+    static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
+        coordinator.stop()
     }
 
     func makeCoordinator() -> Coordinator {
@@ -213,56 +249,68 @@ struct ListNavigator: NSViewRepresentable {
     }
 
     class Coordinator {
+        /// The view we are attached to, used to tell whether a key event belongs to the overlay.
+        weak var hostView: NSView?
         var snippets: [Snippet] = []
         var selectionBinding: Binding<UUID?>
-        var monitor: Any?
+        private var monitor: Any?
 
         init(_ parent: ListNavigator) {
-            self.selectionBinding = parent._selection
+            self.selectionBinding = parent.$selection
             self.snippets = parent.snippets
-            
-            self.monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-                guard let self = self else { return event }
+        }
+
+        deinit {
+            stop()
+        }
+
+        func start() {
+            guard monitor == nil else { return }
+            monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                guard let self else { return event }
                 return self.handle(event: event)
             }
         }
 
-        deinit {
-            if let monitor = monitor {
-                NSEvent.removeMonitor(monitor)
-            }
+        func stop() {
+            guard let monitor else { return }
+            NSEvent.removeMonitor(monitor)
+            self.monitor = nil
         }
 
         func handle(event: NSEvent) -> NSEvent? {
-            guard event.keyCode == 125 || event.keyCode == 126 else { return event }
-            
+            // Only intercept arrow keys aimed at the overlay window. Without this check the
+            // monitor swallows ↑/↓ app-wide, breaking the Preferences list and text editor.
+            guard let window = hostView?.window,
+                  window.isVisible,
+                  event.window === window else { return event }
+
             // 125 = Down, 126 = Up
-            let isDown = event.keyCode == 125
-            
+            guard event.keyCode == 125 || event.keyCode == 126 else { return event }
             guard !snippets.isEmpty else { return event }
-            
+
+            let isDown = event.keyCode == 125
             let currentID = selectionBinding.wrappedValue
-            let index = snippets.firstIndex(where: { $0.id == currentID }) ?? -1
-            
-            var newIndex = index
-            if isDown {
-                newIndex = min(index + 1, snippets.count - 1)
-                // If nothing was selected, select first
-                if index == -1 { newIndex = 0 }
-            } else {
-                newIndex = max(index - 1, 0)
-                // If nothing was selected, select last? Or first? Let's say first.
-                if index == -1 { newIndex = 0 }
+            let index = snippets.firstIndex(where: { $0.id == currentID })
+
+            let newIndex: Int
+            switch (index, isDown) {
+            case (nil, _):
+                newIndex = isDown ? 0 : snippets.count - 1
+            case (let current?, true):
+                newIndex = min(current + 1, snippets.count - 1)
+            case (let current?, false):
+                newIndex = max(current - 1, 0)
             }
-            
+
             if newIndex != index {
                 DispatchQueue.main.async {
                     self.selectionBinding.wrappedValue = self.snippets[newIndex].id
                 }
-                return nil // Consume event
             }
-            
-            return nil // Consume event even if we didn't move (e.g. at top/bottom) to prevent cursor move
+
+            // Consume the event either way so the text cursor doesn't move.
+            return nil
         }
     }
 }

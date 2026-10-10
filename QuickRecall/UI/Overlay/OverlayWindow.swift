@@ -1,6 +1,6 @@
 import Cocoa
 import SwiftUI
-import ApplicationServices
+
 final class OverlayWindow {
     private var window: NSPanel
 
@@ -29,14 +29,10 @@ final class OverlayWindow {
             let origin = NSPoint(x: frame.midX - size.width / 2, y: frame.midY - size.height / 2)
             window.setFrameOrigin(origin)
         }
-        
 
-        let trusted = AXIsProcessTrusted()
-        print("AX trusted:", trusted)
-        
         // Use NSRunningApplication for more robust activation
         NSRunningApplication.current.activate(options: [.activateIgnoringOtherApps])
-        
+
         window.makeKeyAndOrderFront(nil)
         window.orderFrontRegardless()
     }

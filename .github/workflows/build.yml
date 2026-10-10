@@ -1,0 +1,53 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build QuickRecall
+    # XcodeGen emits an objectVersion 77 project, which needs Xcode 16 or newer.
+    runs-on: macos-15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Select newest available Xcode
+        run: |
+          set -euo pipefail
+          latest=$(ls -d /Applications/Xcode_*.app 2>/dev/null | grep -vi beta | sort -V | tail -1 || true)
+          [ -n "$latest" ] || latest=/Applications/Xcode.app
+          echo "Selecting $latest"
+          sudo xcode-select -s "$latest"
+
+      - name: Install XcodeGen
+        run: brew install xcodegen xcbeautify
+
+      - name: Show tool versions
+        run: |
+          xcodebuild -version
+          xcodegen --version
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project QuickRecall.xcodeproj \
+            -scheme QuickRecall \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcbeautify
+        env:
+          NSUnbufferedIO: YES

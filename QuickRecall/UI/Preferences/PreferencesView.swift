@@ -6,6 +6,7 @@ struct PreferencesView: View {
     @EnvironmentObject var store: SnippetStore
 
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
+    @State private var launchAtLoginError: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -26,18 +27,18 @@ struct PreferencesView: View {
             }
 
             GroupBox(label: Text("General")) {
-                Toggle(isOn: $launchAtLogin) {
-                    Text("Launch at login")
-                }
-                .onChange(of: launchAtLogin) { newValue in
-                    do {
-                        if newValue {
-                            try SMAppService.mainApp.register()
-                        } else {
-                            try SMAppService.mainApp.unregister()
-                        }
-                    } catch {
-                        print("Failed to toggle launch at login: \(error)")
+                VStack(alignment: .leading, spacing: 4) {
+                    Toggle(isOn: $launchAtLogin) {
+                        Text("Launch at login")
+                    }
+                    .onChange(of: launchAtLogin) { newValue in
+                        setLaunchAtLogin(newValue)
+                    }
+
+                    if let launchAtLoginError {
+                        Text(launchAtLoginError)
+                            .font(.caption)
+                            .foregroundStyle(.red)
                     }
                 }
                 .padding(8)
@@ -47,6 +48,25 @@ struct PreferencesView: View {
         }
         .padding(20)
         .frame(minWidth: 680, minHeight: 420)
+    }
+
+    private func setLaunchAtLogin(_ enabled: Bool) {
+        let isCurrentlyEnabled = SMAppService.mainApp.status == .enabled
+        // Also stops the revert below from re-entering this handler.
+        guard enabled != isCurrentlyEnabled else { return }
+
+        do {
+            if enabled {
+                try SMAppService.mainApp.register()
+            } else {
+                try SMAppService.mainApp.unregister()
+            }
+            launchAtLoginError = nil
+        } catch {
+            Log.preferences.error("Failed to toggle launch at login: \(error.localizedDescription, privacy: .public)")
+            launchAtLoginError = "Couldn't update launch at login: \(error.localizedDescription). This usually requires QuickRecall to be signed and located in /Applications."
+            launchAtLogin = isCurrentlyEnabled
+        }
     }
 }
 
@@ -91,29 +111,26 @@ struct SnippetsEditorView: View {
 
             Divider()
 
-            if let id = selection, let idx = store.snippets.firstIndex(where: { $0.id == id }) {
-                // Safer binding that checks bounds to prevent crashes during deletion
-                let binding = Binding(
-                    get: { 
-                        if store.snippets.indices.contains(idx) {
-                            return store.snippets[idx]
-                        } else {
-                            return Snippet(name: "", content: "") // Fallback
-                        }
-                    },
-                    set: { 
-                        if store.snippets.indices.contains(idx) {
-                            store.snippets[idx] = $0 
-                        }
-                    }
-                )
-                EditorDetailView(snippet: binding)
+            if let id = selection, store.snippets.contains(where: { $0.id == id }) {
+                EditorDetailView(snippet: binding(for: id))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 VStack { Text("Select or add a snippet") }.frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .padding(0)
+    }
+
+    /// Binds by identity rather than array index, so reordering or deleting a snippet
+    /// can never leave the editor pointing at the wrong row or out of bounds.
+    private func binding(for id: UUID) -> Binding<Snippet> {
+        Binding(
+            get: { store.snippets.first(where: { $0.id == id }) ?? Snippet(id: id, name: "", content: "") },
+            set: { newValue in
+                guard let index = store.snippets.firstIndex(where: { $0.id == id }) else { return }
+                store.snippets[index] = newValue
+            }
+        )
     }
 
     func add() {
@@ -124,16 +141,7 @@ struct SnippetsEditorView: View {
 
     func deleteSelected() {
         guard let id = selection else { return }
-        
-        // 1. Deselect first to detach the DetailView binding immediately
         selection = nil
-        
-        // 2. Remove the item from the store. 
-        // We use removeAll(where:) for safety instead of index.
-        // Doing this ensures we don't need to worry about index validity.
-        // We do it immediately; if the previous 'selection = nil' triggered a render,
-        // the DetailView should already be gone or tearing down.
-        // If we still see crashes, we can wrap this in DispatchQueue.main.async
         store.snippets.removeAll { $0.id == id }
     }
 }

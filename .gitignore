@@ -3,24 +3,17 @@
 
 # Xcode
 build/
-*.xcodeproj
-!default.xcodeproj
-*.xcworkspace
-!default.xcworkspace
+DerivedData/
 xcuserdata/
+*.xcworkspace
 *.xccheckout
 *.moved-aside
-DerivedData/
 *.hmap
 *.ipa
-*.xg
 
-# XcodeGen
+# XcodeGen (project is generated from project.yml)
 *.xcodeproj
 
 # Swift Package Manager
 .swiftpm/
 .build/
-
-# QuickRecall specific
-# (None specific yet, but good to have the section)

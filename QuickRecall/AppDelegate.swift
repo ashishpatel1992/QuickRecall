@@ -64,9 +64,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if overlayWindow.isVisible {
             overlayWindow.close()
         } else {
-            previousApp = NSWorkspace.shared.frontmostApplication
+            previousApp = resolveTargetApp()
             overlayWindow.show()
         }
+    }
+
+    /// The app that should receive the paste. Never QuickRecall itself — when the overlay is
+    /// opened from the status bar we are already frontmost, so fall back to the last known target.
+    private func resolveTargetApp() -> NSRunningApplication? {
+        guard let front = NSWorkspace.shared.frontmostApplication,
+              front.processIdentifier != ProcessInfo.processInfo.processIdentifier,
+              front.bundleIdentifier != Bundle.main.bundleIdentifier else {
+            return previousApp
+        }
+        return front
     }
 
     func openPreferences() {
@@ -79,7 +90,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func insert(text: String, copyOnly: Bool, completion: @escaping (Bool) -> Void) {
         overlayWindow.close()
 
-        guard let targetApp = previousApp else {
+        guard let targetApp = previousApp, !targetApp.isTerminated else {
             InsertionManager.insert(text: text, copyOnly: copyOnly, completion: completion)
             return
         }
@@ -108,6 +119,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Poll up to ~1s waiting for focus to switch back to target app
         attemptPaste(remaining: 20)
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        snippetStore.flush()
     }
 
 }
