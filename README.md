@@ -71,6 +71,8 @@ On first use, QuickRecall will request **Accessibility Permissions**. This is re
 2.  Enable the toggle for **QuickRecall**.
 3.  Restart the app if necessary.
 
+> **Note for developers:** the project is ad-hoc signed (`CODE_SIGN_IDENTITY: "-"`). macOS ties Accessibility grants to an app's code signature, so every local rebuild produces a new identity and invalidates the previous grant — you may see stale duplicate QuickRecall entries in the Accessibility list. Remove the old entries and re-add the app, or sign with a stable Developer ID certificate to avoid this entirely. The same applies to **Launch at login**, which requires a properly signed app in `/Applications`.
+
 ## 🤝 Contributing
 
 We welcome contributions from the community! Whether it's fixing a bug, adding a feature, or improving documentation, your help is appreciated.

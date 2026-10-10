@@ -3,11 +3,20 @@ import Combine
 
 final class SnippetStore: ObservableObject {
     @Published var snippets: [Snippet] = [] {
-        didSet { save() }
+        didSet {
+            guard isLoaded, snippets != oldValue else { return }
+            scheduleSave()
+        }
     }
 
     private let folderURL: URL
     private let fileURL: URL
+    private let ioQueue = DispatchQueue(label: "com.quickrecall.snippetstore.io", qos: .utility)
+    private var pendingSave: DispatchWorkItem?
+    private var isLoaded = false
+
+    /// Typing in the snippet editor mutates `snippets` on every keystroke; coalesce the writes.
+    private let saveDebounce: TimeInterval = 0.5
 
     init() {
         let fm = FileManager.default
@@ -15,6 +24,7 @@ final class SnippetStore: ObservableObject {
             .appendingPathComponent("QuickRecall", isDirectory: true)
         fileURL = folderURL.appendingPathComponent("snippets.json")
         load()
+        isLoaded = true
     }
 
     func load() {
@@ -31,20 +41,45 @@ final class SnippetStore: ObservableObject {
                     Snippet(name: "Hello World", content: "echo Hello, world!"),
                     Snippet(name: "Email", content: "user@example.com")
                 ]
-                save()
+                write(snippets)
             }
         } catch {
-            print("SnippetStore load error: \(error)")
+            Log.store.error("Failed to load snippets: \(error.localizedDescription, privacy: .public)")
             snippets = []
         }
     }
 
-    func save() {
+    /// Writes any pending changes immediately. Call before the app terminates.
+    func flush() {
+        pendingSave?.cancel()
+        pendingSave = nil
+        let snapshot = snippets
+        ioQueue.sync { self.write(snapshot) }
+    }
+
+    private func scheduleSave() {
+        pendingSave?.cancel()
+        let snapshot = snippets
+        let work = DispatchWorkItem { [weak self] in
+            self?.write(snapshot)
+        }
+        pendingSave = work
+        ioQueue.asyncAfter(deadline: .now() + saveDebounce, execute: work)
+    }
+
+    private func write(_ snippets: [Snippet]) {
         do {
-            let data = try JSONEncoder().encode(snippets)
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            let data = try encoder.encode(snippets)
             try data.write(to: fileURL, options: .atomic)
+            // Snippets can hold secrets; keep the file readable by the owner only.
+            try FileManager.default.setAttributes(
+                [.posixPermissions: 0o600],
+                ofItemAtPath: fileURL.path
+            )
         } catch {
-            print("SnippetStore save error: \(error)")
+            Log.store.error("Failed to save snippets: \(error.localizedDescription, privacy: .public)")
         }
     }
 }

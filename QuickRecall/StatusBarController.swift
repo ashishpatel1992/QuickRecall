@@ -17,8 +17,6 @@ final class StatusBarController {
             } else {
                 button.title = "QR"
             }
-            button.target = self
-            button.action = #selector(statusItemClicked)
         }
 
         let menu = NSMenu()
@@ -44,10 +42,6 @@ final class StatusBarController {
         
         menu.items.forEach { $0.target = self }
         statusItem.menu = menu
-    }
-
-    @objc private func statusItemClicked() {
-        // Left click shows menu by default
     }
 
     @objc private func openOverlay() { onActivate() }
